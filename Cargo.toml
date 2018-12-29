@@ -1,0 +1,9 @@
+[workspace]
+
+members = [
+    "aoc01",
+    "aoc02",
+]
+
+[profile.release]
+lto = "yes"
