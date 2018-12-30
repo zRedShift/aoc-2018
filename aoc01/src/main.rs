@@ -21,18 +21,20 @@ fn part_one(numbers: &[i32]) -> i32 {
 }
 
 fn part_two(numbers: &[i32]) -> i32 {
-    let mut set = HashSet::new();
-    let mut sum = 0;
+    numbers
+        .iter()
+        .cycle()
+        .scan((0, HashSet::new()), |(sum, set), &num| {
+            if !set.insert(*sum) {
+                Some(Some(*sum))
+            } else {
+                *sum += num;
 
-    loop {
-        for &num in numbers {
-            if !set.insert(sum) {
-                return sum;
+                Some(None)
             }
-
-            sum += num
-        }
-    }
+        })
+        .find_map(|a| a)
+        .unwrap()
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
