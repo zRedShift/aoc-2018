@@ -6,6 +6,8 @@ use std::path::Path;
 
 use regex::Regex;
 
+const BOARD_SIZE: usize = 1 << 10;
+
 struct Offset(usize, usize);
 
 struct Size(usize, usize);
@@ -62,8 +64,8 @@ fn parse_input(path: &Path) -> Result<Vec<Rect>, Box<dyn Error>> {
         .collect()
 }
 
-fn part_one(rects: &[Rect]) -> ([[u8; 1000]; 1000], u32) {
-    let mut board = [[0u8; 1000]; 1000];
+fn part_one(rects: &[Rect]) -> ([[u8; BOARD_SIZE]; BOARD_SIZE], u32) {
+    let mut board = [[0u8; BOARD_SIZE]; BOARD_SIZE];
 
     let collisions: usize = rects
         .iter()
@@ -89,7 +91,7 @@ fn part_one(rects: &[Rect]) -> ([[u8; 1000]; 1000], u32) {
     (board, collisions as u32)
 }
 
-fn part_two(rects: &[Rect], board: [[u8; 1000]; 1000]) -> Option<u32> {
+fn part_two(rects: &[Rect], board: [[u8; BOARD_SIZE]; BOARD_SIZE]) -> Option<u32> {
     rects
         .iter()
         .find(|&rect| {
