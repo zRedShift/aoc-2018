@@ -57,16 +57,14 @@ fn parse_input(path: &Path) -> Result<HashMap<usize, Distribution>, Box<dyn Erro
             Entry::GuardId(id) => (id, 0),
             Entry::FallAsleep(start) => (id, start),
             Entry::WakeUp(end) => {
-                let duration = end - start;
-
                 let dist = h.entry(id).or_insert(Distribution {
                     histogram: [0u8; 1 << 6],
                     total: 0,
                 });
 
-                dist.total += duration;
+                dist.total += end - start;
 
-                for x in dist.histogram.iter_mut().skip(start).take(duration) {
+                for x in &mut dist.histogram[start..end] {
                     *x = x.saturating_add(1);
                 }
 
