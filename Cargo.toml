@@ -13,6 +13,7 @@ members = [
     "aoc10",
     "aoc11",
     "aoc12",
+    "aoc13",
 ]
 
 [profile.release]
