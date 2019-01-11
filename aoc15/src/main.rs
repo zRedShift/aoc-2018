@@ -13,7 +13,7 @@ use self::Target::*;
 const UNREACHABLE: u8 = u8::max_value();
 const DIRECTIONS: [Direction; 4] = [North, West, East, South];
 const HP: HitPoints = HitPoints(200);
-const AP: u8 = 3;
+const GOBLIN_AP: u8 = 3;
 
 #[derive(Debug)]
 enum Error {
@@ -48,12 +48,12 @@ impl fmt::Display for Error {
     }
 }
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone)]
 struct HitPoints(u8);
 
 impl HitPoints {
-    fn hit(&mut self) -> bool {
-        match self.0.overflowing_sub(AP) {
+    fn hit(&mut self, ap: u8) -> bool {
+        match self.0.overflowing_sub(ap) {
             (0, _) | (_, true) => {
                 self.0 = 0;
                 true
@@ -66,7 +66,7 @@ impl HitPoints {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Entity {
     Empty,
     Wall,
@@ -128,6 +128,7 @@ impl Position {
 #[derive(Debug)]
 struct Board {
     entities: Vec<Entity>,
+    elf_ap: u8,
     width: usize,
 }
 
@@ -160,7 +161,11 @@ impl FromStr for Board {
             _ => None,
         }));
 
-        Ok(Board { entities, width })
+        Ok(Board {
+            entities,
+            elf_ap: 3,
+            width,
+        })
     }
 }
 
@@ -227,13 +232,22 @@ impl Board {
         self.entities.swap(old.0, new.0);
     }
 
-    fn attack(&mut self, position: Position) {
+    fn attack(&mut self, position: Position) -> bool {
         let victim = &mut self.entities[position];
 
         match victim {
-            Goblin(hp) | Elf(hp) => {
-                if hp.hit() {
-                    victim.die()
+            Goblin(hp) => {
+                if hp.hit(self.elf_ap) {
+                    victim.die();
+                }
+                false
+            }
+            Elf(hp) => {
+                if hp.hit(GOBLIN_AP) {
+                    victim.die();
+                    true
+                } else {
+                    false
                 }
             }
             entity => panic!("attempting to attack {}", entity,),
@@ -256,11 +270,13 @@ impl Board {
                 match (
                     position
                         .to(self.width, direction)
-                        .map(|position| &self.entities[position]),
+                        .map(|position| (position, &self.entities[position])),
                     elf,
                 ) {
-                    (Some(Goblin(hp)), true) | (Some(Elf(hp)), false) => Some((hp, position)),
-                    (Some(Empty), _) => {
+                    (Some((position, Goblin(hp))), true) | (Some((position, Elf(hp))), false) => {
+                        Some((hp, position))
+                    }
+                    (Some((_, Empty)), _) => {
                         can_move = true;
                         None
                     }
@@ -326,14 +342,14 @@ impl Board {
                 _ => None,
             })
             .flat_map(|position| {
-                DIRECTIONS.iter().filter_map(move |direction| {
+                DIRECTIONS.iter().map(move |direction| {
                     if let Some((position, Empty)) = position
                         .to(self.width, direction)
                         .map(|position| (position, &self.entities[position]))
                     {
-                        Some((position, pathfinding[position]))
+                        (position, pathfinding[position])
                     } else {
-                        None
+                        (position, UNREACHABLE)
                     }
                 })
             })
@@ -361,7 +377,7 @@ impl Board {
         }
     }
 
-    fn simulate(&mut self) -> (u32, u32, bool) {
+    fn simulate(&mut self, must_survive: bool) -> Option<(u32, u32, bool)> {
         let turn_order = &mut Vec::new();
         let pathfinding = &mut vec![0; self.entities.len()];
         let mut round = 0;
@@ -369,36 +385,27 @@ impl Board {
         let (hp, elf_victory) = 'outer: loop {
             self.calculate_turn_order(turn_order);
 
-            println!("Round {}:", round);
-            for &position in turn_order.iter() {
-                println!("{}", self.entities[position]);
-            }
-            println!("{}", self);
-
             for &position in turn_order.iter() {
                 match self.pick_action(position) {
-                    Wait => println!("{} waits.", self.entities[position]),
+                    Wait => (),
                     Attack(target) => {
-                        println!(
-                            "{} attacks {}.",
-                            self.entities[position], self.entities[target]
-                        );
-                        self.attack(target)
+                        if self.attack(target) && must_survive {
+                            return None;
+                        }
                     }
                     Move => {
                         self.update_paths(position, pathfinding);
                         match self.find_closest_target(position, pathfinding) {
                             Found(target) => {
-                                println!(
-                                    "{} moves.",
-                                    self.entities[position]
-                                );
-                                self.move_to(
-                                    position,
-                                    self.find_path_to_target(target, pathfinding),
-                                )
+                                let new_position = self.find_path_to_target(target, pathfinding);
+                                self.move_to(position, new_position);
+                                if let Attack(target) = self.pick_action(new_position) {
+                                    if self.attack(target) && must_survive {
+                                        return None;
+                                    }
+                                }
                             }
-                            Unreachable => println!("{} waits.", self.entities[position]),
+                            Unreachable => (),
                             NotFound(hp, elf_victory) => break 'outer (hp, elf_victory),
                         }
                     }
@@ -408,7 +415,7 @@ impl Board {
             round += 1;
         };
 
-        (round, hp, elf_victory)
+        Some((round, hp, elf_victory))
     }
 }
 
@@ -420,11 +427,37 @@ fn parse_input(path: &Path) -> Result<Board, Error> {
 }
 
 fn main() -> Result<(), Error> {
-    let path = Path::new("inputs/input-15-00.txt");
+    let path = Path::new("inputs/input-15-01.txt");
 
     let mut board = parse_input(path)?;
+    let entities = board.entities.clone();
 
-    println!("{:?}", board.simulate());
+    let (rounds, hp, elf_victory) = board.simulate(false).unwrap();
 
-    Ok(())
+    let victor = if elf_victory { "Elves" } else { "Goblins" };
+
+    println!("Results for Elves with {} attack power:", board.elf_ap);
+    println!("Combat ends after {} full rounds", rounds);
+    println!("{} win with {} total hit points left", victor, hp);
+    println!("Outcome: {} * {} = {}", rounds, hp, rounds * hp);
+    println!();
+
+    for ap in GOBLIN_AP + 1..=u8::max_value() {
+        let mut board = Board {
+            entities: entities.clone(),
+            width: board.width,
+            elf_ap: ap,
+        };
+
+        if let Some((rounds, hp, _)) = board.simulate(true) {
+            println!("Results for Elves with {} attack power:", board.elf_ap);
+            println!("Combat ends after {} full rounds", rounds);
+            println!("Elves win with {} total hit points left", hp);
+            println!("Outcome: {} * {} = {}", rounds, hp, rounds * hp);
+
+            return Ok(());
+        }
+    }
+
+    Err("Elves exceeded maximum attack power while still suffering casualties".into())
 }
