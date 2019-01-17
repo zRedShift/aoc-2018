@@ -146,7 +146,7 @@ fn compute(mut ans: i32, mult: i32, mut add: i32) -> i32 {
 }
 
 fn fast_execute(seed: i32, mult: i32) -> (i32, i32) {
-    let mut add = 0 | OR;
+    let mut add = OR;
     let mut add_set = HashSet::new();
     let mut ans_set = HashSet::new();
 
