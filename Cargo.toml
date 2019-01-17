@@ -21,6 +21,7 @@ members = [
     "aoc18",
     "aoc19",
     "aoc20",
+    "aoc21",
 ]
 
 [profile.release]
