@@ -153,7 +153,7 @@ impl Octant {
     }
 
     fn coverage(&self, nanobot: &NanoBot) -> bool {
-        if !nanobot.in_radius(&Coordinate {
+        nanobot.in_radius(&Coordinate {
             x: if nanobot.coordinate.x < self.x_min {
                 self.x_min
             } else if nanobot.coordinate.x > self.x_max {
@@ -175,11 +175,7 @@ impl Octant {
             } else {
                 nanobot.coordinate.z
             },
-        }) {
-            false
-        } else {
-            true
-        }
+        })
     }
 
     fn coverage_all(&self, nanobots: &[NanoBot]) -> i32 {

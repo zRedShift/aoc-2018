@@ -32,7 +32,9 @@ impl fmt::Display for Error {
     }
 }
 
-fn parse_input(path: &Path) -> Result<(Vec<Vec<usize>>, Vec<Option<HashSet<usize>>>), Error> {
+type Input = (Vec<Vec<usize>>, Vec<Option<HashSet<usize>>>);
+
+fn parse_input(path: &Path) -> Result<Input, Error> {
     let re = Regex::new(
         r"Step (?P<blocker>[A-Z]) must be finished before step (?P<waiter>[A-Z]) can begin.",
     )
